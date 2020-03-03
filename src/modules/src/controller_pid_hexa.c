@@ -24,14 +24,14 @@ PidObject pidQX;
 PidObject pidQY;
 PidObject pidQZ;
 
-#define Hexa_PID_X_KP 0.0
+#define Hexa_PID_X_KP 1.00
 #define Hexa_PID_X_KI 0.0
-#define Hexa_PID_X_KD 0.00005
+#define Hexa_PID_X_KD 1.5
 #define Hexa_PID_X_INTEGRATION_LIMIT 0.01
 
-#define Hexa_PID_Y_KP 0.0
+#define Hexa_PID_Y_KP 1.00
 #define Hexa_PID_Y_KI 0.0
-#define Hexa_PID_Y_KD 0.00005
+#define Hexa_PID_Y_KD 1.5
 #define Hexa_PID_Y_INTEGRATION_LIMIT 0.01
 
 #define Hexa_PID_Z_KP 19.0
@@ -93,6 +93,7 @@ static bool took_off = false;
 static bool isInit = false;
 static bool firstControllerLoop = true;
 static bool shutdown_flag = true;
+static bool test_flag = false;
 static bool landing_flag = false;
 void controllerPidHexaInit(void)
 {
@@ -133,6 +134,31 @@ bool controllerPidHexaTest(void)
 
     return pass;
 }
+float transform_error(double error, double min_bound, double threshold, double max_bound)
+{
+    if(error<threshold && error > -threshold)
+    {
+        // value is to low to be used -> it is ignored.
+        return 0;
+    }
+    else if(error > max_bound)
+    {
+        // value is too high
+        return (float)max_bound;
+    }
+    else if(error < min_bound)
+    {
+        // value is too low 
+        return (float)min_bound;
+    }
+    else
+    {
+        //value is within bounds
+        return error;
+    }
+    
+
+}
 // Updates control to desired in drone frame accelerations that power distribution will need to apply
 void controllerPidHexa(control_t* control, setpoint_t* setpoint,
     const sensorData_t* sensors,
@@ -140,18 +166,18 @@ void controllerPidHexa(control_t* control, setpoint_t* setpoint,
     const uint32_t tick)
 {
     if (RATE_DO_EXECUTE(RATE_CONTROLLER_LOOP, tick)) {
-        //Emergency stop
         if (setpoint->position.z > 41.99 && setpoint->position.z < 42.01) {
+            //Emergency stop
             shutdown_flag = true;
             landing_flag = false;
         }
-        //Landing
         if (setpoint->position.z > 62.99 && setpoint->position.z < 63.01) {
+            //Landing
             landing_flag = true;
             sz = sz * 0.995;
         }
-        //Take off
         if (setpoint->position.z > 83.99 && setpoint->position.z < 84.01) {
+            //Take off
             shutdown_flag = false;
             landing_flag = false;
             took_off = false;
@@ -166,7 +192,8 @@ void controllerPidHexa(control_t* control, setpoint_t* setpoint,
                 firstControllerLoop = false;
                 t_init = 0;
             }
-            t_init = fmax(fmin(1, (float)tick / 1000), t_init);
+            t_init = fmax(fmin(1, t_init + 1/RATE_CONTROLLER_LOOP), t_init);
+            // computing state and setpoints
             cx = state->position.x;
             cy = state->position.y;
             cz = state->position.z;
@@ -182,6 +209,9 @@ void controllerPidHexa(control_t* control, setpoint_t* setpoint,
             pidSetDesired(&pidX, sx);
             pidSetDesired(&pidY, sy);
             pidSetDesired(&pidZ, sz);
+            pidSetDesired(&pidQX, 0);
+            pidSetDesired(&pidQY, 0);
+            pidSetDesired(&pidQZ, 0);
             //Get Quaternion error by multiplication rather than by substraction
             struct quat current_attitude = mkquat(qx, qy, qz, qw);
             struct quat setpoint_attitude = mkquat(sqx, sqy, sqz, sqw);
@@ -191,46 +221,67 @@ void controllerPidHexa(control_t* control, setpoint_t* setpoint,
             {
                 q_error = mkquat(-q_error.x, -q_error.y, -q_error.z, q_error.w);
             }
-            struct vec p_error = mkvec(pidUpdate(&pidX, cx, true), pidUpdate(&pidY, cy, true), pidUpdate(&pidZ, cz, true) + 9.81);
-            // Stabilization control
-            ledseqRun(LED_GREEN_L, seq_linkup);
-            //taking off
-            if (cz < 0.05 && az < 0.40 && !(took_off)) {
-                ledseqRun(LED_GREEN_R, seq_linkup);
-                az += 0.00025;
-            }
-            //took off
-            else {
-                took_off = true;
-                az = (float)(fmin(fmax((float)(Hexa_mass)*p_error.z, 0.40), 0.80));
-            }
-            //High enough to start taking care of translations
-            if (cz > 0.2) {
-                ax = (float)(fmin(fmax((float)(Hexa_mass)*p_error.x, -0.01), 0.01));
-                ay = (float)(fmin(fmax((float)(Hexa_mass)*p_error.y, -0.01), 0.01));
-                // ax = 0;
-                // ay = 0;
-                sz = 1.5;
-            }
-            else {
+            //The values given to control should be taken as forces. The value given by the PID should be taken as accelerations.
+            //Default control for attitude
+            wx = pidUpdate(&pidQX, q_error.x, true) * Hexa_Ixx;
+            wy = pidUpdate(&pidQY, q_error.y, true) * Hexa_Iyy;
+            wz = pidUpdate(&pidQZ, q_error.z, true) * Hexa_Izz;
+            //Default control for position
+            // ax = Hexa_mass * pidUpdate(&pidX, cx, true);
+            ax = 0;
+            ay = 0;
+            // ay = Hexa_mass * pidUpdate(&pidY, cy, true);
+            // adding gravity to the error so that the drone is able to hover more easily.
+            az = Hexa_mass * (pidUpdate(&pidZ, cz, true) + 9.81);
+            if (cz < 0.15 && !(took_off)) {
+                //taking off, warming the motors, ignoring the x,y controls.
                 ax = 0;
                 ay = 0;
+                // az += 0.00025;
             }
-            // high enough to try special commands
+            else {
+                //took off, default control for altitude.
+                took_off = true;
+            }
+            if (cz > 0.2) {
+                //High enough to set a new altitude goal
+                sz = 1.5;
+            }
             if (took_off && !landing_flag && cz > 1.0) {
-                ax = (float)(0.9 * Hexa_mass);
+                // High enough to try special commands
+                ax = (float)(0.05);
             }
-            pidSetDesired(&pidQX, 0);
-            pidSetDesired(&pidQY, 0);
-            pidSetDesired(&pidQZ, 0);
-            // pidSetDesired(&pidQX, ay);
-            // pidSetDesired(&pidQY, -ax);
-            // Extracting only the vector part of the quaternion error
-            wx = -(float)fmin(fmax(pidUpdate(&pidQX, q_error.x, true) * (float)(Hexa_Ixx), -0.1), 0.1);
-            wy = -(float)fmin(fmax(pidUpdate(&pidQY, q_error.y, true) * (float)(Hexa_Iyy), -0.1), 0.1);
-            wz = -(float)(fmin(fmax(pidUpdate(&pidQZ, q_error.z, true) * (float)(Hexa_Izz), -0.05), 0.05));
+            if (test_flag) {
+                // Debug subpart of the controller.
+                if (landing_flag) {
+                    //Second phase using default controls
+                    // ax = (float)0.00;
+                    // ay = (float)0.00;
+                    // az = (float)0.6;
+                    // wx = 0.000;
+                    // wy = 0.000;
+                    // wz = 0.005;
+                }
+                else {
+                    //First and default phase
+                    ax = (float)0.00;
+                    ay = (float)0.00;
+                    az = (float)0.4;
+                    wx = 0.000;
+                    wy = 0.00;
+                    wz = 0.00;
+                }
+            }
+            //Truncating the force/torque setpoints inside bounds
+            ax = transform_error(ax, -0.05, 0.02, 0.05);
+            ay = transform_error(ay, -0.05, 0.02, 0.05);
+            az = transform_error(az, 0.30, 0.01, 0.60);
+            wx = transform_error(wx, -0.005, 0.00, 0.005);
+            wy = transform_error(wy, -0.005, 0.00, 0.005);
+            wz = transform_error(wz, -0.005, 0.00, 0.005);
         }
         else {
+            //Shutting down
             ax = 0;
             ay = 0;
             az = 0;
@@ -238,12 +289,13 @@ void controllerPidHexa(control_t* control, setpoint_t* setpoint,
             wy = 0;
             wz = 0;
         }
-        control->ax = ax;
-        control->ay = ay;
+        //Updating the control setpoints
+        control->ax = -ax;
+        control->ay = -ay;
         control->az = az;
         control->roll = (int16_t)(wx * 10000);
         control->pitch = (int16_t)(wy * 10000);
-        control->yaw = (int16_t)(wz * 10000);
+        control->yaw = -(int16_t)(wz * 10000);
     }
 }
 
