@@ -125,9 +125,9 @@ void powerDistribution(const control_t* control)
     cax = control->ax;
     cay = control->ay;
     caz = control->az;
-    cwx = ((float) control->roll) /10000;
-    cwy = ((float) control->pitch) /10000;
-    cwz = ((float) control->yaw) /10000;
+    cwx = ((float) control->roll) /1000000;
+    cwy = ((float) control->pitch) /1000000;
+    cwz = ((float) control->yaw) /1000000;
     //converting the desired forces given by the controller into a vec6
     struct vec6 at = mkvec6(cax, cay, caz, cwx, cwy, cwz);
     //computing the desired control from desired forces into desired squarred rotor speed
