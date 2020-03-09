@@ -13,7 +13,7 @@
 #include "log.h"
 #include "math3d.h"
 #include "param.h"
-#define RATE_CONTROLLER_LOOP RATE_1000_HZ
+#define RATE_CONTROLLER_LOOP RATE_100_HZ
 
 #define UPDATE_DT (float)(1.0f / RATE_CONTROLLER_LOOP)
 
@@ -39,26 +39,26 @@ PidObject pidQZ;
 #define Hexa_PID_Z_KD 15.0
 #define Hexa_PID_Z_INTEGRATION_LIMIT 0.2
 
-#define Hexa_PID_QX_KP 600.0
-#define Hexa_PID_QX_KI 50.0
-#define Hexa_PID_QX_KD 150.0
+#define Hexa_PID_QX_KP 20.0
+#define Hexa_PID_QX_KI 0.0
+#define Hexa_PID_QX_KD 2.0
 #define Hexa_PID_QX_INTEGRATION_LIMIT 0.017
 
-#define Hexa_PID_QY_KP 300.0
-#define Hexa_PID_QY_KI 50.0
-#define Hexa_PID_QY_KD 150.0
+#define Hexa_PID_QY_KP 20.0
+#define Hexa_PID_QY_KI 0.0
+#define Hexa_PID_QY_KD 0.40
 #define Hexa_PID_QY_INTEGRATION_LIMIT 0.017
 
 #define Hexa_PID_QZ_KP 00.0
 #define Hexa_PID_QZ_KI 1.0
 #define Hexa_PID_QZ_KD 300.0
 #define Hexa_PID_QZ_INTEGRATION_LIMIT 0.004
-#define Hexa_mass 0.045 //45g in kg
+#define Hexa_mass 0.056 //45g in kg
 #define Hexa_Ixx 0.000016
 #define Hexa_Iyy 0.000016
 #define Hexa_Izz 0.000029
 #define D_FILTER true
-#define D_FILTER_ATTITUDE true 
+#define D_FILTER_ATTITUDE false 
 #define CUTOFF_FREQ 20.0f
 #define CUTOFF_FREQ_ATTITUDE 220.0f
 // acceleration control
@@ -187,7 +187,7 @@ void controllerPidHexa(control_t* control, setpoint_t* setpoint,
             init_flag = false;
             default_flag = false;
             //Set a first altitude setpoint.
-            sz = 0.8;
+            sz = 0.5;
         }
         if (setpoint->position.z > 104.99 && setpoint->position.z < 105.01) {
             //Warming motors mode
@@ -205,7 +205,8 @@ void controllerPidHexa(control_t* control, setpoint_t* setpoint,
         // computing state and setpoints
         cx = state->position.x;
         cy = state->position.y;
-        cz = state->position.z;
+        // cz = state->position.z;
+        cz = 1;
         qw = state->attitudeQuaternion.w;
         qx = state->attitudeQuaternion.x;
         qy = state->attitudeQuaternion.y;
@@ -232,22 +233,28 @@ void controllerPidHexa(control_t* control, setpoint_t* setpoint,
         }
         //The values given to control should be taken as forces. The value given by the PID should be taken as accelerations.
         //Default control for attitude
-        wx = pidUpdate(&pidQX, q_error.x, true) * Hexa_Ixx;
-        wy = pidUpdate(&pidQY, q_error.y, true) * Hexa_Iyy;
-        wz = pidUpdate(&pidQZ, q_error.z, true) * Hexa_Izz;
+        // wx = pidUpdate(&pidQX, q_error.x, true) * Hexa_Ixx;
+        // wy = pidUpdate(&pidQY, q_error.y, true) * Hexa_Iyy;
+        // wz = pidUpdate(&pidQZ, q_error.z, true) * Hexa_Izz;
+        // wx = wx * 0.8 - 0.2* (Hexa_PID_QX_KP * q_error.x - sensors->gyro.x * Hexa_PID_QX_KD)* Hexa_Ixx;
+        // wy = wy * 0.9 + 0.1* (Hexa_PID_QY_KP * q_error.y - sensors->gyro.y * Hexa_PID_QY_KD)* Hexa_Iyy;
+        wx = (-Hexa_PID_QX_KP * q_error.x + sensors->gyro.x * Hexa_PID_QX_KD)* Hexa_Ixx;
+        wy = (-Hexa_PID_QY_KP * q_error.y + sensors->gyro.y * Hexa_PID_QY_KD)* Hexa_Iyy;
+        // wz = (Hexa_PID_QZ_KP * q_error.z - sensors->gyro.z * Hexa_PID_QZ_KD)* Hexa_Izz;
         //Default control for position
         // ax = Hexa_mass * pidUpdate(&pidX, cx, true);
         // ay = Hexa_mass * pidUpdate(&pidY, cy, true);
         ax = 0;
         ay = 0;
         // adding gravity to the error so that the drone is able to hover more easily.
-        az = Hexa_mass * (pidUpdate(&pidZ, cz, true) + 9.81);
-        // az = 0.4; 
+        // az = Hexa_mass * (pidUpdate(&pidZ, cz, true) + 9.81);
+        // az = Hexa_mass * (9.81);
+        az = 0.4; 
         //Truncating the force/torque setpoints inside bounds
         ax = transform_error(ax, -0.05, 0.02, 0.05);
         ay = transform_error(ay, -0.05, 0.02, 0.05);
-        az = transform_error(az, 0.10, 0.01, 0.80);
-        wx = transform_error(wx, -0.030, 0.00, 0.030);
+        az = transform_error(az, 0.40, 0.01, 0.80);
+        wx = transform_error(wx, -0.010, 0.00, 0.010);
         wy = transform_error(wy, -0.010, 0.00, 0.010);
         wz = transform_error(wz, -0.000, 0.00, 0.000);
         if (shutdown_flag) {
@@ -289,10 +296,11 @@ void controllerPidHexa(control_t* control, setpoint_t* setpoint,
             wz = 0;
         }
         else if (taking_off_flag) {
-            az = 0.6;
+            az = 0.7;
             ax = 0.0;
             ay = 0.0;
-            if (cz > 0.4) {
+            // if (cz > 2.5) {
+            if (t > 0.1) {
                 //The UAV took off;
                 taking_off_flag = false;
             }
@@ -304,9 +312,9 @@ void controllerPidHexa(control_t* control, setpoint_t* setpoint,
         control->ax = ax;
         control->ay = ay;
         control->az = az;
-        control->roll = -(int16_t)(wx * 1000000);
-        control->pitch = -(int16_t)(wy * 1000000);
-        control->yaw = -(int16_t)(wz * 1000000);
+        control->roll = -(int16_t)(wx * 10000);
+        control->pitch = -(int16_t)(wy * 10000);
+        control->yaw = -(int16_t)(wz * 10000);
     }
 }
 
