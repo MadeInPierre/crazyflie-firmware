@@ -73,6 +73,14 @@ static float caz;
 static float cwx;
 static float cwy;
 static float cwz;
+// acceleration control
+static float oax;
+static float oay;
+static float oaz;
+// angular acceleration control
+static float owx;
+static float owy;
+static float owz;
 
 static struct mat66 hexa_inverse_matrix = {{
  { 4.430E+07, -5.868E+02,  8.062E+06, -4.820E+08,  9.683E+03,  1.267E+08},
@@ -90,6 +98,14 @@ static struct mat66 hexa_inverse_matrix = {{
 //  {-1.515E+07, +2.624E+07,  +8.748E+06, -3.682E+08, +6.378E+08 -1.177E+08}
  }};
 
+static struct mat66 hexa_direct_matrix = {{
+{ 7.524E-09, -3.762E-09, -3.762E-09,  7.524E-09, -3.762E-09, -3.762E-09},
+{ 4.845E-14, -6.516E-09,  6.516E-09, -1.380E-13, -6.516E-09,  6.516E-09},
+{ 2.067E-08,  2.067E-08,  2.067E-08,  2.067E-08,  2.067E-08,  2.067E-08},
+{-6.916E-10, -3.458E-10,  3.458E-10,  6.916E-10,  3.458E-10, -3.458E-10},
+{-4.403E-15, -5.990E-10, -5.990E-10, -1.274E-14,  5.989E-10,  5.990E-10},
+{ 1.316E-09, -1.316E-09,  1.316E-09, -1.316E-09,  1.316E-09, -1.316E-09}
+}};
 static float max_hexa_rotor_speed = 3000;
 static float min_hexa_rotor_speed = 0;
 
@@ -128,8 +144,15 @@ void powerDistribution(const control_t* control)
     cwx = ((float) control->roll) /10000;
     cwy = ((float) control->pitch) /10000;
     cwz = ((float) control->yaw) /10000;
+
+    oax = cax; 
+    oay = cay; 
+    oaz = caz; 
+    owx = cwx;
+    owy = cwy; 
+    owz = cwz;
     //converting the desired forces given by the controller into a vec6
-    struct vec6 at = mkvec6(cax, cay, caz, cwx, cwy, cwz);
+    struct vec6 at = mkvec6(oax, oay, oaz, owx, owy, owz);
     //computing the desired control from desired forces into desired squarred rotor speed
     struct vec6 u = mvmul6(hexa_inverse_matrix, at);
     // converting u into pwm
@@ -138,12 +161,12 @@ void powerDistribution(const control_t* control)
     float inv_delta_hexa_rotor_speed_squarred = 1 / max_hexa_rotor_speed_squarred - min_hexa_rotor_speed_squarred;
     u = v6addscl(u, -min_hexa_rotor_speed_squarred);
     u = v6scl(u, inv_delta_hexa_rotor_speed_squarred);
-    // reducing setpoint until it can be achieved. Reducing only component not related to stability
+    // reducing setpoint until it can be achieved. Reducing only component unrelated to stability
     for (int i = 0; i < 50; ++i) {
-        if (u.x > 0.99 | u.x<0 | u.y> 0.99 | u.y<0 | u.z> 0.99 | u.z<0 | u.t> 1 | u.t<0 | u.u> 0.99 | u.u<0 | u.w> 0.99 | u.w < 0) {
-            at.x = at.x * 0.9;
-            at.y = at.y * 0.9;
-            at.w = at.w * 0.9;
+        if (u.x > 1. | u.x<0 | u.y> 1. | u.y<0 | u.z> 1. | u.z<0 | u.t> 1. | u.t<0 | u.u> 1. | u.u<0 | u.w> 1. | u.w < 0) {
+            at.x = at.x * 0.95;
+            at.y = at.y * 0.95;
+            at.w = at.w * 0.95;
             u = mvmul6(hexa_inverse_matrix, at);
             u = v6addscl(u, -min_hexa_rotor_speed_squarred);
             u = v6scl(u, inv_delta_hexa_rotor_speed_squarred);
@@ -153,27 +176,33 @@ void powerDistribution(const control_t* control)
         }
     }
 
-    for (int i = 0; i < 50; ++i) {
-        if (norm(u) > 5.5) {
-            at.x = at.x * 0.9;
-            at.y = at.y * 0.9;
-            at.w = at.w * 0.9;
-            u = mvmul6(hexa_inverse_matrix, at);
-            u = v6addscl(u, -min_hexa_rotor_speed_squarred);
-            u = v6scl(u, inv_delta_hexa_rotor_speed_squarred);
-        }
-        else {
-            i = 50;
-        }
-    }
+    // for (int i = 0; i < 50; ++i) {
+    //     if (norm(u) > 6.0) {
+    //         at.x = at.x * 0.9;
+    //         at.y = at.y * 0.9;
+    //         at.w = at.w * 0.9;
+    //         u = mvmul6(hexa_inverse_matrix, at);
+    //         u = v6addscl(u, -min_hexa_rotor_speed_squarred);
+    //         u = v6scl(u, inv_delta_hexa_rotor_speed_squarred);
+    //     }
+    //     else {
+    //         i = 50;
+    //     }
+    // }
+    //Clamping the motors activations to bounds
     u = v6sclamp(u, 0, 1);
+    //Computing tu actual force torque sent to the motors after the clamping.
+    struct vec6 u_squarred_rotor_speed = v6scl(u, 1/inv_delta_hexa_rotor_speed_squarred);
+    u_squarred_rotor_speed = v6addscl(u_squarred_rotor_speed, min_hexa_rotor_speed_squarred);
+    at = mvmul6(hexa_direct_matrix, u_squarred_rotor_speed);
+
     // updating corrected setpoints
-    cax = at.x;
-    cay = at.y;
-    caz = at.z;
-    cwx = at.t;
-    cwy = at.u;
-    cwz = at.w;
+    oax = at.x;
+    oay = at.y;
+    oaz = at.z;
+    owx = at.t;
+    owy = at.u;
+    owz = at.w;
 
     // faction of each motor thrust desired
     f1 = u.x;
@@ -189,17 +218,11 @@ void powerDistribution(const control_t* control)
     float a = 2.1302e-11;
     float c = 5.4845e-4;
     m1 = fmax((-b + sqrt(b * b - 4 * a * (c - u.x))) / (2 * a * 65535), 0);
-    // m1 = (float)motorPower.m1 / (float)65536;
     m2 = fmax((-b + sqrt(b * b - 4 * a * (c - u.y))) / (2 * a * 65535), 0);
-    // m2 = (float)motorPower.m2 / (float)65536;
     m3 = fmax((-b + sqrt(b * b - 4 * a * (c - u.z))) / (2 * a * 65535), 0);
-    // m3 = (float)motorPower.m3 / (float)65536;
     m4 = fmax((-b + sqrt(b * b - 4 * a * (c - u.t))) / (2 * a * 65535), 0);
-    // m4 = (float)motorPower.m4 / (float)65536;
     m5 = fmax((-b + sqrt(b * b - 4 * a * (c - u.u))) / (2 * a * 65535), 0);
-    // m5 = (float)motorPower.m5 / (float)65536;
     m6 = fmax((-b + sqrt(b * b - 4 * a * (c - u.w))) / (2 * a * 65535), 0);
-    // m6 = (float)motorPower.m6 / (float)65536;
     // scaling and setting motor pwm
     motorPower.m1 = limitThrust(m1 * 65535);
     motorPower.m2 = limitThrust(m2 * 65535);
@@ -254,13 +277,19 @@ LOG_ADD(LOG_FLOAT, caz, &caz)
 LOG_ADD(LOG_FLOAT, cwx, &cwx)
 LOG_ADD(LOG_FLOAT, cwy, &cwy)
 LOG_ADD(LOG_FLOAT, cwz, &cwz)
+LOG_ADD(LOG_FLOAT, oax, &oax)
+LOG_ADD(LOG_FLOAT, oay, &oay)
+LOG_ADD(LOG_FLOAT, oaz, &oaz)
+LOG_ADD(LOG_FLOAT, owx, &owx)
+LOG_ADD(LOG_FLOAT, owy, &owy)
+LOG_ADD(LOG_FLOAT, owz, &owz)
 LOG_ADD(LOG_FLOAT, m1, &m1)
 LOG_ADD(LOG_FLOAT, m2, &m2)
 LOG_ADD(LOG_FLOAT, m3, &m3)
 LOG_ADD(LOG_FLOAT, m4, &m4)
 LOG_ADD(LOG_FLOAT, m5, &m5)
 LOG_ADD(LOG_FLOAT, m6, &m6)
-LOG_ADD(LOG_FLOAT,f1, &f1)
+LOG_ADD(LOG_FLOAT, f1, &f1)
 LOG_ADD(LOG_FLOAT, f2, &f2)
 LOG_ADD(LOG_FLOAT, f3, &f3)
 LOG_ADD(LOG_FLOAT, f4, &f4)

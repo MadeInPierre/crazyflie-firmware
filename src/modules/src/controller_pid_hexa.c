@@ -13,7 +13,7 @@
 #include "log.h"
 #include "math3d.h"
 #include "param.h"
-#define RATE_CONTROLLER_LOOP RATE_100_HZ
+#define RATE_CONTROLLER_LOOP RATE_1000_HZ
 
 #define UPDATE_DT (float)(1.0f / RATE_CONTROLLER_LOOP)
 
@@ -24,43 +24,43 @@ PidObject pidQX;
 PidObject pidQY;
 PidObject pidQZ;
 
-#define Hexa_PID_X_KP 0.00
+#define Hexa_PID_X_KP 10.00
 #define Hexa_PID_X_KI 0.0
-#define Hexa_PID_X_KD 1.5
-#define Hexa_PID_X_INTEGRATION_LIMIT 0.01
+#define Hexa_PID_X_KD 50.0
+#define Hexa_PID_X_INTEGRATION_LIMIT 5.05
 
-#define Hexa_PID_Y_KP 0.00
+#define Hexa_PID_Y_KP 10.00
 #define Hexa_PID_Y_KI 0.0
-#define Hexa_PID_Y_KD 1.5
-#define Hexa_PID_Y_INTEGRATION_LIMIT 0.01
+#define Hexa_PID_Y_KD 50.0
+#define Hexa_PID_Y_INTEGRATION_LIMIT 5.05
 
 #define Hexa_PID_Z_KP 19.0
 #define Hexa_PID_Z_KI 1.0
-#define Hexa_PID_Z_KD 15.0
-#define Hexa_PID_Z_INTEGRATION_LIMIT 0.2
+#define Hexa_PID_Z_KD 25.0
+#define Hexa_PID_Z_INTEGRATION_LIMIT 5.3
 
-#define Hexa_PID_QX_KP 20.0
+#define Hexa_PID_QX_KP 50.0
 #define Hexa_PID_QX_KI 0.0
-#define Hexa_PID_QX_KD 2.0
-#define Hexa_PID_QX_INTEGRATION_LIMIT 0.017
+#define Hexa_PID_QX_KD 80.0
+#define Hexa_PID_QX_INTEGRATION_LIMIT 0.02
 
-#define Hexa_PID_QY_KP 20.0
+#define Hexa_PID_QY_KP 50.0
 #define Hexa_PID_QY_KI 0.0
-#define Hexa_PID_QY_KD 0.40
-#define Hexa_PID_QY_INTEGRATION_LIMIT 0.017
+#define Hexa_PID_QY_KD 80.0
+#define Hexa_PID_QY_INTEGRATION_LIMIT 0.02
 
-#define Hexa_PID_QZ_KP 00.0
-#define Hexa_PID_QZ_KI 1.0
-#define Hexa_PID_QZ_KD 300.0
-#define Hexa_PID_QZ_INTEGRATION_LIMIT 0.004
-#define Hexa_mass 0.056 //45g in kg
-#define Hexa_Ixx 0.000016
-#define Hexa_Iyy 0.000016
-#define Hexa_Izz 0.000029
+#define Hexa_PID_QZ_KP 50.0
+#define Hexa_PID_QZ_KI 0.0
+#define Hexa_PID_QZ_KD 60.0
+#define Hexa_PID_QZ_INTEGRATION_LIMIT 0.02
+#define Hexa_mass 0.056 //46g in kg
+#define Hexa_Ixx 0.000019
+#define Hexa_Iyy 0.000019
+#define Hexa_Izz 0.000036
 #define D_FILTER true
-#define D_FILTER_ATTITUDE false 
+#define D_FILTER_ATTITUDE false
 #define CUTOFF_FREQ 20.0f
-#define CUTOFF_FREQ_ATTITUDE 220.0f
+#define CUTOFF_FREQ_ATTITUDE 180.0f
 // acceleration control
 static float ax;
 static float ay;
@@ -77,6 +77,9 @@ static float sz;
 static float cx;
 static float cy;
 static float cz;
+//current velocity
+static float vx;
+static float vy;
 //current attitude
 static float qw;
 static float qx;
@@ -187,7 +190,7 @@ void controllerPidHexa(control_t* control, setpoint_t* setpoint,
             init_flag = false;
             default_flag = false;
             //Set a first altitude setpoint.
-            sz = 0.5;
+            sz = 0.8;
         }
         if (setpoint->position.z > 104.99 && setpoint->position.z < 105.01) {
             //Warming motors mode
@@ -205,8 +208,10 @@ void controllerPidHexa(control_t* control, setpoint_t* setpoint,
         // computing state and setpoints
         cx = state->position.x;
         cy = state->position.y;
-        // cz = state->position.z;
-        cz = 1;
+        cz = state->position.z;
+        vx = state->velocity.x;
+        vy = state->velocity.y;
+        // cz = 1;
         qw = state->attitudeQuaternion.w;
         qx = state->attitudeQuaternion.x;
         qy = state->attitudeQuaternion.y;
@@ -216,8 +221,8 @@ void controllerPidHexa(control_t* control, setpoint_t* setpoint,
         sqx = setpoint->attitudeQuaternion.x;
         sqy = setpoint->attitudeQuaternion.y;
         sqz = setpoint->attitudeQuaternion.z;
-        pidSetDesired(&pidX, sx);
-        pidSetDesired(&pidY, sy);
+        pidSetDesired(&pidX, 0);
+        pidSetDesired(&pidY, 0);
         pidSetDesired(&pidZ, sz);
         pidSetDesired(&pidQX, 0);
         pidSetDesired(&pidQY, 0);
@@ -238,25 +243,25 @@ void controllerPidHexa(control_t* control, setpoint_t* setpoint,
         // wz = pidUpdate(&pidQZ, q_error.z, true) * Hexa_Izz;
         // wx = wx * 0.8 - 0.2* (Hexa_PID_QX_KP * q_error.x - sensors->gyro.x * Hexa_PID_QX_KD)* Hexa_Ixx;
         // wy = wy * 0.9 + 0.1* (Hexa_PID_QY_KP * q_error.y - sensors->gyro.y * Hexa_PID_QY_KD)* Hexa_Iyy;
-        wx = (-Hexa_PID_QX_KP * q_error.x + sensors->gyro.x * Hexa_PID_QX_KD)* Hexa_Ixx;
-        wy = (-Hexa_PID_QY_KP * q_error.y + sensors->gyro.y * Hexa_PID_QY_KD)* Hexa_Iyy;
-        // wz = (Hexa_PID_QZ_KP * q_error.z - sensors->gyro.z * Hexa_PID_QZ_KD)* Hexa_Izz;
+        wx = (-Hexa_PID_QX_KP * q_error.x + 2 * 3.14 / 360. * sensors->gyro.x * Hexa_PID_QX_KD)* Hexa_Ixx;
+        wy = (-Hexa_PID_QY_KP * q_error.y + 2 * 3.14 / 360. * sensors->gyro.y * Hexa_PID_QY_KD)* Hexa_Iyy;
+        wz = (-Hexa_PID_QZ_KP * q_error.z + 2 * 3.14 / 360. * sensors->gyro.z * Hexa_PID_QZ_KD)* Hexa_Izz;
         //Default control for position
-        // ax = Hexa_mass * pidUpdate(&pidX, cx, true);
-        // ay = Hexa_mass * pidUpdate(&pidY, cy, true);
-        ax = 0;
-        ay = 0;
+        ax = -Hexa_mass * pidUpdate(&pidX, vx, true);
+        ay = -Hexa_mass * pidUpdate(&pidY, vy, true);
+        // ax = 0;
+        // ay = 0;
         // adding gravity to the error so that the drone is able to hover more easily.
-        // az = Hexa_mass * (pidUpdate(&pidZ, cz, true) + 9.81);
+        az = Hexa_mass * pidUpdate(&pidZ, cz, true) + 9.81 * Hexa_mass;
         // az = Hexa_mass * (9.81);
-        az = 0.4; 
+        // az = 0.4; 
         //Truncating the force/torque setpoints inside bounds
-        ax = transform_error(ax, -0.05, 0.02, 0.05);
-        ay = transform_error(ay, -0.05, 0.02, 0.05);
-        az = transform_error(az, 0.40, 0.01, 0.80);
-        wx = transform_error(wx, -0.010, 0.00, 0.010);
-        wy = transform_error(wy, -0.010, 0.00, 0.010);
-        wz = transform_error(wz, -0.000, 0.00, 0.000);
+        ax = transform_error(ax, -0.03, 0.01, 0.03);
+        ay = transform_error(ay, -0.03, 0.01, 0.03);
+        az = transform_error(az, 0.40, 0.01, 1.50);
+        wx = transform_error(wx, -0.003, 0.00, 0.003);
+        wy = transform_error(wy, -0.003, 0.00, 0.003);
+        wz = transform_error(wz, -0.003, 0.00, 0.003);
         if (shutdown_flag) {
             ax = 0;
             ay = 0;
@@ -296,11 +301,10 @@ void controllerPidHexa(control_t* control, setpoint_t* setpoint,
             wz = 0;
         }
         else if (taking_off_flag) {
-            az = 0.7;
+            az = 0.57;
             ax = 0.0;
             ay = 0.0;
-            // if (cz > 2.5) {
-            if (t > 0.1) {
+            if (cz > 0.05) {
                 //The UAV took off;
                 taking_off_flag = false;
             }
@@ -327,6 +331,8 @@ LOG_ADD(LOG_FLOAT, wy, &wy)
 LOG_ADD(LOG_FLOAT, wz, &wz)
 LOG_ADD(LOG_FLOAT, sx, &sx)
 LOG_ADD(LOG_FLOAT, sy, &sy)
+LOG_ADD(LOG_FLOAT, vx, &vx)
+LOG_ADD(LOG_FLOAT, vy, &vy)
 LOG_ADD(LOG_FLOAT, sz, &sz)
 LOG_ADD(LOG_FLOAT, cx, &cx)
 LOG_ADD(LOG_FLOAT, cy, &cy)
