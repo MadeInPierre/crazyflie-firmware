@@ -24,34 +24,34 @@ PidObject pidQX;
 PidObject pidQY;
 PidObject pidQZ;
 
-#define Hexa_PID_X_KP 10.00
+#define Hexa_PID_X_KP 0.00
 #define Hexa_PID_X_KI 0.0
 #define Hexa_PID_X_KD 50.0
 #define Hexa_PID_X_INTEGRATION_LIMIT 5.05
 
-#define Hexa_PID_Y_KP 10.00
+#define Hexa_PID_Y_KP 0.00
 #define Hexa_PID_Y_KI 0.0
 #define Hexa_PID_Y_KD 50.0
 #define Hexa_PID_Y_INTEGRATION_LIMIT 5.05
 
-#define Hexa_PID_Z_KP 19.0
-#define Hexa_PID_Z_KI 1.0
-#define Hexa_PID_Z_KD 25.0
+#define Hexa_PID_Z_KP 80.0
+#define Hexa_PID_Z_KI 0.0
+#define Hexa_PID_Z_KD 300.0
 #define Hexa_PID_Z_INTEGRATION_LIMIT 5.3
 
 #define Hexa_PID_QX_KP 50.0
 #define Hexa_PID_QX_KI 0.0
-#define Hexa_PID_QX_KD 80.0
+#define Hexa_PID_QX_KD 50.0
 #define Hexa_PID_QX_INTEGRATION_LIMIT 0.02
 
 #define Hexa_PID_QY_KP 50.0
 #define Hexa_PID_QY_KI 0.0
-#define Hexa_PID_QY_KD 80.0
+#define Hexa_PID_QY_KD 50.0
 #define Hexa_PID_QY_INTEGRATION_LIMIT 0.02
 
 #define Hexa_PID_QZ_KP 50.0
 #define Hexa_PID_QZ_KI 0.0
-#define Hexa_PID_QZ_KD 60.0
+#define Hexa_PID_QZ_KD 50.0
 #define Hexa_PID_QZ_INTEGRATION_LIMIT 0.02
 #define Hexa_mass 0.056 //46g in kg
 #define Hexa_Ixx 0.000019
@@ -59,7 +59,7 @@ PidObject pidQZ;
 #define Hexa_Izz 0.000036
 #define D_FILTER true
 #define D_FILTER_ATTITUDE false
-#define CUTOFF_FREQ 20.0f
+#define CUTOFF_FREQ 5.0f
 #define CUTOFF_FREQ_ATTITUDE 180.0f
 // acceleration control
 static float ax;
@@ -143,7 +143,7 @@ float transform_error(double error, double min_bound, double threshold, double m
 {
     if (error < threshold && error > -threshold) {
         // value is to low to be used -> it is ignored.
-        return 0;
+        return (float)0;
     }
     else if (error > max_bound) {
         // value is too high
@@ -155,7 +155,7 @@ float transform_error(double error, double min_bound, double threshold, double m
     }
     else {
         //value is within bounds
-        return error;
+        return (float)error;
     }
 }
 // Updates control to desired in drone frame accelerations that power distribution will need to apply
@@ -221,17 +221,20 @@ void controllerPidHexa(control_t* control, setpoint_t* setpoint,
         sqx = setpoint->attitudeQuaternion.x;
         sqy = setpoint->attitudeQuaternion.y;
         sqz = setpoint->attitudeQuaternion.z;
-        pidSetDesired(&pidX, 0);
-        pidSetDesired(&pidY, 0);
+        // sx = setpoint->position.x; 
+        // sy = setpoint->position.y;
+        pidSetDesired(&pidX, sx);
+        pidSetDesired(&pidY, sy);
         pidSetDesired(&pidZ, sz);
-        pidSetDesired(&pidQX, 0);
-        pidSetDesired(&pidQY, 0);
-        pidSetDesired(&pidQZ, 0);
+        pidSetDesired(&pidQX, sqx);
+        pidSetDesired(&pidQY, sqx);
+        pidSetDesired(&pidQZ, sqz);
         //Get Quaternion error by multiplication rather than by substraction
         struct quat current_attitude = mkquat(qx, qy, qz, qw);
         struct quat setpoint_attitude = mkquat(sqx, sqy, sqz, sqw);
         struct quat inv_attitude = qinv(current_attitude);
         struct quat q_error = qqmul(setpoint_attitude, inv_attitude);
+        struct vec p_error = mkvec(sx - cx, sy -cy, sz - cz);
         if (q_error.w < 0) //rotation would be faster in the other direction
         {
             q_error = mkquat(-q_error.x, -q_error.y, -q_error.z, q_error.w);
@@ -243,12 +246,14 @@ void controllerPidHexa(control_t* control, setpoint_t* setpoint,
         // wz = pidUpdate(&pidQZ, q_error.z, true) * Hexa_Izz;
         // wx = wx * 0.8 - 0.2* (Hexa_PID_QX_KP * q_error.x - sensors->gyro.x * Hexa_PID_QX_KD)* Hexa_Ixx;
         // wy = wy * 0.9 + 0.1* (Hexa_PID_QY_KP * q_error.y - sensors->gyro.y * Hexa_PID_QY_KD)* Hexa_Iyy;
-        wx = (-Hexa_PID_QX_KP * q_error.x + 2 * 3.14 / 360. * sensors->gyro.x * Hexa_PID_QX_KD)* Hexa_Ixx;
-        wy = (-Hexa_PID_QY_KP * q_error.y + 2 * 3.14 / 360. * sensors->gyro.y * Hexa_PID_QY_KD)* Hexa_Iyy;
-        wz = (-Hexa_PID_QZ_KP * q_error.z + 2 * 3.14 / 360. * sensors->gyro.z * Hexa_PID_QZ_KD)* Hexa_Izz;
+        wx = (Hexa_PID_QX_KP * q_error.x - 2 * 3.14 / 360. * sensors->gyro.x * Hexa_PID_QX_KD)* Hexa_Ixx;
+        wy = (Hexa_PID_QY_KP * q_error.y - 2 * 3.14 / 360. * sensors->gyro.y * Hexa_PID_QY_KD)* Hexa_Iyy;
+        wz = (Hexa_PID_QZ_KP * q_error.z - 2 * 3.14 / 360. * sensors->gyro.z * Hexa_PID_QZ_KD)* Hexa_Izz;
         //Default control for position
-        ax = -Hexa_mass * pidUpdate(&pidX, vx, true);
-        ay = -Hexa_mass * pidUpdate(&pidY, vy, true);
+        // ax = -Hexa_mass * pidUpdate(&pidX, vx, true);
+        // ay = -Hexa_mass * pidUpdate(&pidY, vy, true);
+        // ax = Hexa_mass * (Hexa_PID_X_KP * p_error.x - Hexa_PID_X_KD * vx);
+        // ay = Hexa_mass * (Hexa_PID_Y_KP * p_error.y - Hexa_PID_Y_KD * vy);
         // ax = 0;
         // ay = 0;
         // adding gravity to the error so that the drone is able to hover more easily.
@@ -256,12 +261,12 @@ void controllerPidHexa(control_t* control, setpoint_t* setpoint,
         // az = Hexa_mass * (9.81);
         // az = 0.4; 
         //Truncating the force/torque setpoints inside bounds
-        ax = transform_error(ax, -0.03, 0.01, 0.03);
-        ay = transform_error(ay, -0.03, 0.01, 0.03);
+        ax = transform_error(ax, -0.02, 0.01, 0.02);
+        ay = transform_error(ay, -0.02, 0.01, 0.02);
         az = transform_error(az, 0.40, 0.01, 1.50);
-        wx = transform_error(wx, -0.003, 0.00, 0.003);
-        wy = transform_error(wy, -0.003, 0.00, 0.003);
-        wz = transform_error(wz, -0.003, 0.00, 0.003);
+        wx = transform_error(wx, -0.05, 0.00, 0.05);
+        wy = transform_error(wy, -0.05, 0.00, 0.05);
+        wz = transform_error(wz, -0.05, 0.00, 0.05);
         if (shutdown_flag) {
             ax = 0;
             ay = 0;
@@ -316,9 +321,9 @@ void controllerPidHexa(control_t* control, setpoint_t* setpoint,
         control->ax = ax;
         control->ay = ay;
         control->az = az;
-        control->roll = -(int16_t)(wx * 10000);
-        control->pitch = -(int16_t)(wy * 10000);
-        control->yaw = -(int16_t)(wz * 10000);
+        control->roll = (int16_t)(wx * 10000);
+        control->pitch = (int16_t)(wy * 10000);
+        control->yaw = (int16_t)(wz * 10000);
     }
 }
 
