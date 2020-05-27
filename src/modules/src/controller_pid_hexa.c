@@ -13,7 +13,7 @@
 #include "log.h"
 #include "math3d.h"
 #include "param.h"
-#define RATE_CONTROLLER_LOOP RATE_1000_HZ
+#define RATE_CONTROLLER_LOOP RATE_500_HZ
 
 #define UPDATE_DT (float)(1.0f / RATE_CONTROLLER_LOOP)
 
@@ -53,7 +53,7 @@ PidObject pidQZ;
 #define Hexa_PID_QZ_KI 0.0
 #define Hexa_PID_QZ_KD 50.0
 #define Hexa_PID_QZ_INTEGRATION_LIMIT 0.02
-#define Hexa_mass 0.056 //46g in kg
+#define Hexa_mass 0.066 //56g in kg
 #define Hexa_Ixx 0.000019
 #define Hexa_Iyy 0.000019
 #define Hexa_Izz 0.000036
@@ -61,6 +61,10 @@ PidObject pidQZ;
 #define D_FILTER_ATTITUDE false
 #define CUTOFF_FREQ 5.0f
 #define CUTOFF_FREQ_ATTITUDE 180.0f
+#define MAX_ROLL 5
+#define MAX_PITCH 5
+#define KVX 0.0012
+#define KVY 0.0012
 // acceleration control
 static float ax;
 static float ay;
@@ -90,6 +94,9 @@ static float sqw;
 static float sqx;
 static float sqy;
 static float sqz;
+static float sroll;
+static float spitch;
+static float syaw;
 static float t;
 static float t_init;
 static bool taking_off_flag = false;
@@ -230,11 +237,11 @@ void controllerPidHexa(control_t* control, setpoint_t* setpoint,
         pidSetDesired(&pidQY, sqx);
         pidSetDesired(&pidQZ, sqz);
         //Get Quaternion error by multiplication rather than by substraction
+        struct vec p_error = mkvec(sx - cx, sy -cy, sz - cz);
         struct quat current_attitude = mkquat(qx, qy, qz, qw);
         struct quat setpoint_attitude = mkquat(sqx, sqy, sqz, sqw);
         struct quat inv_attitude = qinv(current_attitude);
         struct quat q_error = qqmul(setpoint_attitude, inv_attitude);
-        struct vec p_error = mkvec(sx - cx, sy -cy, sz - cz);
         if (q_error.w < 0) //rotation would be faster in the other direction
         {
             q_error = mkquat(-q_error.x, -q_error.y, -q_error.z, q_error.w);
@@ -249,6 +256,8 @@ void controllerPidHexa(control_t* control, setpoint_t* setpoint,
         wx = (Hexa_PID_QX_KP * q_error.x - 2 * 3.14 / 360. * sensors->gyro.x * Hexa_PID_QX_KD)* Hexa_Ixx;
         wy = (Hexa_PID_QY_KP * q_error.y - 2 * 3.14 / 360. * sensors->gyro.y * Hexa_PID_QY_KD)* Hexa_Iyy;
         wz = (Hexa_PID_QZ_KP * q_error.z - 2 * 3.14 / 360. * sensors->gyro.z * Hexa_PID_QZ_KD)* Hexa_Izz;
+        wx = wx + (KVY * vy);
+        wy = wy - (KVX * vx);
         //Default control for position
         // ax = -Hexa_mass * pidUpdate(&pidX, vx, true);
         // ay = -Hexa_mass * pidUpdate(&pidY, vy, true);
@@ -263,10 +272,10 @@ void controllerPidHexa(control_t* control, setpoint_t* setpoint,
         //Truncating the force/torque setpoints inside bounds
         ax = transform_error(ax, -0.02, 0.01, 0.02);
         ay = transform_error(ay, -0.02, 0.01, 0.02);
-        az = transform_error(az, 0.40, 0.01, 1.50);
-        wx = transform_error(wx, -0.05, 0.00, 0.05);
-        wy = transform_error(wy, -0.05, 0.00, 0.05);
-        wz = transform_error(wz, -0.05, 0.00, 0.05);
+        az = transform_error(az, 0.60, 0.01, 1.50);
+        wx = transform_error(wx, -0.03, 0.00, 0.03);
+        wy = transform_error(wy, -0.03, 0.00, 0.03);
+        wz = transform_error(wz, -0.03, 0.00, 0.03);
         if (shutdown_flag) {
             ax = 0;
             ay = 0;

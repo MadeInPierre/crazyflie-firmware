@@ -32,6 +32,10 @@
 #include "motors.h"
 #include "num.h"
 #include "param.h"
+#define KZ 0.7
+#define KROLL 0.0000005
+#define KPITCH -0.0000005
+#define KYAW 0.0000005
 
 static bool motorSetEnable = false;
 
@@ -89,13 +93,6 @@ static struct mat66 hexa_inverse_matrix = {{
  { 4.430E+07, -1.027E+03,  8.062E+06,  4.820E+08, -9.708E+03, -1.267E+08},
  {-2.215E+07, -3.837E+07,  8.062E+06,  2.410E+08,  4.174E+08,  1.267E+08},
  {-2.215E+07,  3.837E+07,  8.062E+06, -2.410E+08,  4.174E+08, -1.267E+08} 
- 
-//  {+3.030E+07, -3.367E+02,  +8.748E+06, -7.364E+08, +1.544E+04 +1.177E+08},
-//  {-1.515E+07, -2.624E+07,  +8.748E+06, -3.682E+08, -6.378E+08 -1.177E+08},
-//  {-1.515E+07, +2.624E+07,  +8.748E+06, +3.682E+08, -6.378E+08 +1.177E+08},
-//  {+3.030E+07, -7.744E+02,  +8.748E+06, +7.365E+08, -1.528E+04 -1.177E+08},
-//  {-1.515E+07, -2.624E+07,  +8.748E+06, +3.682E+08, +6.378E+08 +1.177E+08},
-//  {-1.515E+07, +2.624E+07,  +8.748E+06, -3.682E+08, +6.378E+08 -1.177E+08}
  }};
 
 static struct mat66 hexa_direct_matrix = {{
@@ -106,6 +103,7 @@ static struct mat66 hexa_direct_matrix = {{
 {-4.403E-15, -5.990E-10, -5.990E-10, -1.274E-14,  5.989E-10,  5.990E-10},
 { 1.316E-09, -1.316E-09,  1.316E-09, -1.316E-09,  1.316E-09, -1.316E-09}
 }};
+
 static float max_hexa_rotor_speed = 3000;
 static float min_hexa_rotor_speed = 0;
 
@@ -135,27 +133,46 @@ void powerStop()
     motorsSetRatio(MOTOR_M6, 0);
 }
 
+float transform_error(double error, double min_bound, double threshold, double max_bound)
+{
+    if (error < threshold && error > -threshold) {
+        // value is to low to be used -> it is ignored.
+        return (float)0;
+    }
+    else if (error > max_bound) {
+        // value is too high
+        return (float)max_bound;
+    }
+    else if (error < min_bound) {
+        // value is too low
+        return (float)min_bound;
+    }
+    else {
+        //value is within bounds
+        return (float)error;
+    }
+}
+
 void powerDistribution(const control_t* control)
 {
     // ledseqRun(LED_GREEN_R, seq_linkup);
-    cax = control->ax;
-    cay = control->ay;
-    caz = control->az;
-    // cwx = ((float) control->roll) /10000;
-    // cwy = ((float) control->pitch) /10000;
-    // cwz = ((float) control->yaw) /10000;
-    // cwx = ((float) control->roll) /10000;
-    // cwy = ((float) control->pitch) /10000;
-    // cwz = ((float) control->yaw) /10000;
-
+    cax = 0;
+    cay = 0;
+    caz = KZ * control->az;
+    cwx = KROLL * ((float) control->roll);
+    cwy = KPITCH * ((float) control->pitch);
+    cwz = KYAW * ((float) control->yaw);
     oax = cax; 
     oay = cay; 
-    oaz = caz; 
-    owx = cwx;
-    owy = cwy; 
-    owz = cwz;
+
+    oaz = transform_error(caz, 0.45, 0.01, 0.80);
+    owx = transform_error(cwx, -0.009, 0.0, 0.009);
+    owy = transform_error(cwy, -0.009, 0.0, 0.009);
+    owz = transform_error(cwz, -0.009, 0.0, 0.009);
+
     //converting the desired forces given by the controller into a vec6
     struct vec6 at = mkvec6(oax, oay, oaz, owx, owy, owz);
+
     //computing the desired control from desired forces into desired squarred rotor speed
     struct vec6 u = mvmul6(hexa_inverse_matrix, at);
     // converting u into pwm
@@ -164,35 +181,6 @@ void powerDistribution(const control_t* control)
     float inv_delta_hexa_rotor_speed_squarred = 1 / max_hexa_rotor_speed_squarred - min_hexa_rotor_speed_squarred;
     u = v6addscl(u, -min_hexa_rotor_speed_squarred);
     u = v6scl(u, inv_delta_hexa_rotor_speed_squarred);
-    // reducing setpoint until it can be achieved. Reducing only component unrelated to stability
-    for (int i = 0; i < 50; ++i) {
-        if (u.x > 1. | u.x<0 | u.y> 1. | u.y<0 | u.z> 1. | u.z<0 | u.t> 1. | u.t<0 | u.u> 1. | u.u<0 | u.w> 1. | u.w < 0) {
-            at.x = at.x * 0.95;
-            at.y = at.y * 0.95;
-            at.w = at.w * 0.95;
-            u = mvmul6(hexa_inverse_matrix, at);
-            u = v6addscl(u, -min_hexa_rotor_speed_squarred);
-            u = v6scl(u, inv_delta_hexa_rotor_speed_squarred);
-        }
-        else {
-            i = 50;
-        }
-    }
-
-    // for (int i = 0; i < 50; ++i) {
-    //     if (norm(u) > 6.0) {
-    //         at.x = at.x * 0.9;
-    //         at.y = at.y * 0.9;
-    //         at.w = at.w * 0.9;
-    //         u = mvmul6(hexa_inverse_matrix, at);
-    //         u = v6addscl(u, -min_hexa_rotor_speed_squarred);
-    //         u = v6scl(u, inv_delta_hexa_rotor_speed_squarred);
-    //     }
-    //     else {
-    //         i = 50;
-    //     }
-    // }
-    //Clamping the motors activations to bounds
     u = v6sclamp(u, 0, 1);
     //Computing tu actual force torque sent to the motors after the clamping.
     struct vec6 u_squarred_rotor_speed = v6scl(u, 1/inv_delta_hexa_rotor_speed_squarred);
