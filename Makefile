@@ -35,9 +35,9 @@ CFLAGS += -DCRAZYFLIE_FW
 
 ######### Stabilizer configuration ##########
 ## These are set by the platform (see tools/make/platforms/*.mk), can be overwritten here
-ESTIMATOR          ?=any
-CONTROLLER         =PID # one of Any, PID, Mellinger
-POWER_DISTRIBUTION=hexa 
+ESTIMATOR          ?=kalman
+CONTROLLER         =PID# one of Any, PID, Mellinger
+POWER_DISTRIBUTION=hexa_plan 
 
 #OpenOCD conf
 RTOS_DEBUG        ?= 0
@@ -160,7 +160,8 @@ PROJ_OBJ += estimator.o estimator_complementary.o
 PROJ_OBJ += controller.o controller_mellinger.o controller_pid.o
 # PROJ_OBJ += power_distribution_$(POWER_DISTRIBUTION).o
 # PROJ_OBJ += power_distribution_hexa.o
-PROJ_OBJ += power_distribution_hexa2.o
+# PROJ_OBJ += power_distribution_hexa2.o
+PROJ_OBJ += power_distribution_hexa_plan.o
 PROJ_OBJ += estimator_kalman.o kalman_core.o kalman_supervisor.o
 
 # High-Level Commander

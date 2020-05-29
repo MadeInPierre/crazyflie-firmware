@@ -32,10 +32,11 @@
 #include "motors.h"
 #include "num.h"
 #include "param.h"
-#define KZ 0.7
-#define KROLL 0.0000005
-#define KPITCH -0.0000005
-#define KYAW 0.0000005
+// #define KZ 1./65535 * 500
+#define KZ 0.8
+#define KROLL 2./65535. * 0.05
+#define KPITCH -2./65535 * 0.05
+#define KYAW 2./65535. * 0.05
 
 static bool motorSetEnable = false;
 
@@ -165,10 +166,10 @@ void powerDistribution(const control_t* control)
     oax = cax; 
     oay = cay; 
 
-    oaz = transform_error(caz, 0.45, 0.01, 0.80);
-    owx = transform_error(cwx, -0.009, 0.0, 0.009);
-    owy = transform_error(cwy, -0.009, 0.0, 0.009);
-    owz = transform_error(cwz, -0.009, 0.0, 0.009);
+    oaz = transform_error(caz, 0.55, 0.01, 0.85);
+    // owx = transform_error(cwx, -0.009, 0.0, 0.009);
+    // owy = transform_error(cwy, -0.009, 0.0, 0.009);
+    // owz = transform_error(cwz, -0.009, 0.0, 0.009);
 
     //converting the desired forces given by the controller into a vec6
     struct vec6 at = mkvec6(oax, oay, oaz, owx, owy, owz);
