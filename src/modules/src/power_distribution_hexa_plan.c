@@ -53,6 +53,14 @@ static struct {
   uint16_t m6;
 } motorPowerSet;
 
+int16_t r; 
+int16_t p; 
+float t; 
+int16_t y;
+int16_t K_y = 1.0;
+float K_t = 1.0;
+int16_t K_p = 1.0;
+int16_t K_r = 1.0;
 void powerDistributionInit(void)
 {
 
@@ -83,16 +91,19 @@ void powerStop()
 
 void powerDistribution(const control_t *control)
 {
-    int16_t r = control->roll / 4.0f;
-    int16_t p = control->pitch / 2.0f;
+    r = K_r * control->roll / 4.0f;
+    p = K_p * control->pitch / 2.0f;
+    t = K_t * control->az;
+    y = K_y * control->yaw;
     p = p;
-    r = -r;
-    motorPower.m6 = limitThrust(5*control->az - control->yaw - p + r);
-    motorPower.m5 = limitThrust(5*control->az + control->yaw - p - r);
-    motorPower.m4 = limitThrust(5*control->az - control->yaw - 2 * r);
-    motorPower.m3 = limitThrust(5*control->az + control->yaw + p - r);
-    motorPower.m2 = limitThrust(5*control->az - control->yaw + p + r);
-    motorPower.m1 = limitThrust(5*control->az + control->yaw + 2 * r);
+    r = r;
+    y = y;
+    motorPower.m6 = limitThrust(t - y - p - r);
+    motorPower.m5 = limitThrust(t + y - p + r);
+    motorPower.m4 = limitThrust(t - y + 2 * r);
+    motorPower.m3 = limitThrust(t + y + p + r);
+    motorPower.m2 = limitThrust(t - y + p - r);
+    motorPower.m1 = limitThrust(t + y - 2 * r);
 
     if (motorSetEnable) {
         motorsSetRatio(MOTOR_M1, motorPowerSet.m1);
@@ -114,6 +125,10 @@ void powerDistribution(const control_t *control)
 
 PARAM_GROUP_START(motorPowerSet)
 PARAM_ADD(PARAM_UINT8, enable, &motorSetEnable)
+PARAM_ADD(PARAM_FLOAT, K_r, &K_r)
+PARAM_ADD(PARAM_FLOAT, K_p, &K_p)
+PARAM_ADD(PARAM_FLOAT, K_y, &K_y)
+PARAM_ADD(PARAM_FLOAT, K_t, &K_t)
 PARAM_ADD(PARAM_UINT16, m1, &motorPowerSet.m1)
 PARAM_ADD(PARAM_UINT16, m2, &motorPowerSet.m2)
 PARAM_ADD(PARAM_UINT16, m3, &motorPowerSet.m3)
@@ -123,6 +138,11 @@ PARAM_ADD(PARAM_UINT16, m6, &motorPowerSet.m6)
 PARAM_GROUP_STOP(ring)
 
 LOG_GROUP_START(motor)
+
+LOG_ADD(LOG_INT16, r, &r)
+LOG_ADD(LOG_INT16, p, &p)
+LOG_ADD(LOG_INT16, y, &y)
+LOG_ADD(LOG_FLOAT, t, &t)
 LOG_ADD(LOG_INT32, m4, &motorPower.m4)
 LOG_ADD(LOG_INT32, m1, &motorPower.m1)
 LOG_ADD(LOG_INT32, m2, &motorPower.m2)

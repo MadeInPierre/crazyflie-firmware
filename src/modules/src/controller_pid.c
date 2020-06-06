@@ -54,7 +54,7 @@ void controllerPid(control_t *control, setpoint_t *setpoint,
   }
 
   if (RATE_DO_EXECUTE(POSITION_RATE, tick)) {
-    positionController(&actuatorX, &actuatorY, &actuatorZ, &attitudeDesired, setpoint, state);
+    positionController(&actuatorZ, &actuatorY, &actuatorX, &attitudeDesired, setpoint, state);
   }
 
   if (RATE_DO_EXECUTE(ATTITUDE_RATE, tick)) {
