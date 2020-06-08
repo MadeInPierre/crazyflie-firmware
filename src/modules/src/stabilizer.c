@@ -64,6 +64,7 @@ static setpoint_t setpoint;
 static sensorData_t sensorData;
 static state_t state;
 static control_t control;
+uint32_t tick_log =1;
 
 static StateEstimatorType estimatorType;
 static ControllerType controllerType;
@@ -297,6 +298,7 @@ static void stabilizerTask(void* param)
     }
     calcSensorToOutputLatency(&sensorData);
     tick++;
+    tick_log = tick;
   }
 }
 
@@ -582,6 +584,7 @@ LOG_ADD(LOG_FLOAT, roll, &state.attitude.roll)
 LOG_ADD(LOG_FLOAT, pitch, &state.attitude.pitch)
 LOG_ADD(LOG_FLOAT, yaw, &state.attitude.yaw)
 LOG_ADD(LOG_UINT16, thrust, &control.thrust)
+LOG_ADD(LOG_UINT16, tick, &tick_log)
 LOG_GROUP_STOP(stabilizer)
 
 LOG_GROUP_START(acc)
