@@ -73,6 +73,8 @@
 #define SYSTEM_TASK_PRI         2
 #define CRTP_TX_TASK_PRI        2
 #define CRTP_RX_TASK_PRI        2
+#define P2P_TX_TASK_PRI         2
+#define P2P_RX_TASK_PRI         2
 #define EXTRX_TASK_PRI          2
 #define ZRANGER_TASK_PRI        2
 #define ZRANGER2_TASK_PRI       2
@@ -85,6 +87,7 @@
 #define USDWRITE_TASK_PRI       0
 #define PCA9685_TASK_PRI        3
 #define CMD_HIGH_LEVEL_TASK_PRI 2
+#define TUNNELEXPLORER_TASK_PRI 2
 
 #define SYSLINK_TASK_PRI        3
 #define USBLINK_TASK_PRI        3
@@ -102,6 +105,8 @@
 #define PM_TASK_NAME            "PWRMGNT"
 #define CRTP_TX_TASK_NAME       "CRTP-TX"
 #define CRTP_RX_TASK_NAME       "CRTP-RX"
+#define P2P_TX_TASK_NAME        "P2P-TX"
+#define P2P_RX_TASK_NAME        "P2P-RX"
 #define CRTP_RXTX_TASK_NAME     "CRTP-RXTX"
 #define LOG_TASK_NAME           "LOG"
 #define MEM_TASK_NAME           "MEM"
@@ -123,13 +128,16 @@
 #define PCA9685_TASK_NAME       "PCA9685"
 #define CMD_HIGH_LEVEL_TASK_NAME "CMDHL"
 #define MULTIRANGER_TASK_NAME   "MR"
+#define TUNNELEXPLORER_TASK_NAME "TEXP"
 
 //Task stack sizes
 #define SYSTEM_TASK_STACKSIZE         (2* configMINIMAL_STACK_SIZE)
 #define ADC_TASK_STACKSIZE            configMINIMAL_STACK_SIZE
 #define PM_TASK_STACKSIZE             configMINIMAL_STACK_SIZE
 #define CRTP_TX_TASK_STACKSIZE        configMINIMAL_STACK_SIZE
-#define CRTP_RX_TASK_STACKSIZE        (2* configMINIMAL_STACK_SIZE)
+#define CRTP_RX_TASK_STACKSIZE        configMINIMAL_STACK_SIZE
+#define P2P_TX_TASK_STACKSIZE         configMINIMAL_STACK_SIZE
+#define P2P_RX_TASK_STACKSIZE         (2 * configMINIMAL_STACK_SIZE)
 #define CRTP_RXTX_TASK_STACKSIZE      configMINIMAL_STACK_SIZE
 #define LOG_TASK_STACKSIZE            configMINIMAL_STACK_SIZE
 #define MEM_TASK_STACKSIZE            (2 * configMINIMAL_STACK_SIZE)
@@ -151,6 +159,7 @@
 #define PCA9685_TASK_STACKSIZE        (2 * configMINIMAL_STACK_SIZE)
 #define CMD_HIGH_LEVEL_TASK_STACKSIZE configMINIMAL_STACK_SIZE
 #define MULTIRANGER_TASK_STACKSIZE    (2 * configMINIMAL_STACK_SIZE)
+#define TUNNELEXPLORER_TASK_STACKSIZE (2 * configMINIMAL_STACK_SIZE)
 
 //The radio channel. From 0 to 125
 #define RADIO_CHANNEL 80
@@ -174,7 +183,7 @@
  * \def ACTIVATE_STARTUP_SOUND
  * Playes a startup melody using the motors and PWM modulation
  */
-#define ACTIVATE_STARTUP_SOUND
+// #define ACTIVATE_STARTUP_SOUND
 
 // Define to force initialization of expansion board drivers. For test-rig and programming.
 //#define FORCE_EXP_DETECT

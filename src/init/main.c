@@ -38,6 +38,7 @@
 #include "usec_time.h"
 
 #include "led.h"
+#include "debug.h"
 
 /* ST includes */
 #include "stm32fxxx.h"

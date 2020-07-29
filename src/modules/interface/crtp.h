@@ -45,6 +45,7 @@ typedef enum {
   CRTP_PORT_LOCALIZATION     = 0x06,
   CRTP_PORT_SETPOINT_GENERIC = 0x07,
   CRTP_PORT_SETPOINT_HL      = 0x08,
+  CRTP_PORT_TUNNEL           = 0x0A, // Tunnel custom communication port
   CRTP_PORT_PLATFORM         = 0x0D,
   CRTP_PORT_LINK             = 0x0F,
 } CRTPPort;
@@ -73,6 +74,52 @@ typedef struct _CRTPPacket
     uint8_t raw[CRTP_MAX_DATA_SIZE+1];  //< The full packet "raw"
   };
 } __attribute__((packed)) CRTPPacket;
+
+typedef struct _CRTPTunnelPacket
+{
+  uint8_t size;                         //< Size of data
+  union {
+    struct {
+      // Header
+      union {
+        uint8_t header;                 //< Header selecting channel and port
+        struct {
+#ifndef CRTP_HEADER_COMPAT
+          uint8_t channel     : 2;      //< Selected channel within port
+          uint8_t reserved    : 2;
+          uint8_t port        : 4;      //< Selected port
+#else
+          uint8_t channel  : 2;
+          uint8_t port     : 4;
+          uint8_t reserved : 2;
+#endif
+        };
+      };
+
+      // Data
+      union {
+        // Use when base-to-drone
+        struct {
+          union {
+            uint8_t context;           // Contains destination, 
+            struct {
+              uint8_t destination : 4; // destination drone id, will be sent via relay
+              uint8_t direction   : 1; // true if base-to-drone, false if drone-to-base
+              uint8_t trace       : 1; // true if the message should be traced until destination
+              uint8_t reserved2   : 2;
+            };
+          };
+
+          uint8_t dronedata[CRTP_MAX_DATA_SIZE-1]; //< Data to use when base-to-drone
+        };
+
+        // Use when drone-to-base
+        uint8_t basedata[CRTP_MAX_DATA_SIZE]; //< Data to use when drone-to-base
+      };
+    };
+    uint8_t raw[CRTP_MAX_DATA_SIZE+1];  //< The full packet "raw"
+  };
+} __attribute__((packed)) CRTPTunnelPacket;
 
 typedef void (*CrtpCallback)(CRTPPacket *);
 

@@ -64,6 +64,8 @@
 #include "deck.h"
 #include "extrx.h"
 
+#include "tunnel.h"
+
 /* Private variable */
 static bool selftestPassed;
 static bool canFly;
@@ -99,7 +101,7 @@ void systemInit(void)
   /* Initialized here so that DEBUG_PRINT (buffered) can be used early */
   debugInit();
   crtpInit();
-  consoleInit();
+  consoleInit(); 
 
   DEBUG_PRINT("----------------------------\n");
   DEBUG_PRINT("%s is up and running!\n", platformConfigGetDeviceTypeName());
@@ -170,6 +172,7 @@ void systemTask(void *arg)
   }
   soundInit();
   memInit();
+  tunnelInit(); // Tunnel exploration mod
 
 #ifdef PROXIMITY_ENABLED
   proximityInit();
@@ -185,6 +188,7 @@ void systemTask(void *arg)
   pass &= soundTest();
   pass &= memTest();
   pass &= watchdogNormalStartTest();
+  pass &= tunnelTest(); // Tunnel exploration test
 
   //Start the firmware
   if(pass)
