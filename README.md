@@ -1,8 +1,12 @@
 # Exploration in confined environments
 
-This fork aims to build a coordination algorithm with Crazyflies for exploring constrained and underground environments (mines, tunnels, pipes...).
+This fork aims to build a coordination algorithm with Crazyflies for exploring constrained and underground environments (mines, tunnels, pipes...) in a communication chain formation.
 
 A human can pilot a Crazyflie equipped with a camera and distance sensors in all directions. An avoidance system keeps the drone away from obstacles. When the signal quality between the drone and the human gets too low, a new autonomous Crazyflie takes off and positions itself to relay the signal between the two agents and extends the exploration range for the human. Up to 15 autonomous drones can be part of the relay chain with the current implementation.
+
+This work is presented in the [following article](https://arxiv.org/abs/2003.04409) and available in the git branch `cavemod`. It has been conducted during a 6-months research internship at INRIA, Nancy Grand-Est, France (research team LARSEN).
+
+_**Authors:** Pierre LACLAU, Enrico NATALIZIO, and Jean-Baptiste MOURET designed the study. Pierre LACLAU designed and validated the algorithms with simulations, then developed and performed the experiments._
 
 ## Installation
 
