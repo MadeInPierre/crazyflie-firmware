@@ -61,7 +61,7 @@
 // amount of thrust independent of the battery voltage. Based on thrust measurement.
 #define ENABLE_THRUST_BAT_COMPENSATED
 
-//#define ENABLE_ONESHOT125
+#define ENABLE_ONESHOT125
 
 #ifdef ENABLE_ONESHOT125
 /**

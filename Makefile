@@ -8,6 +8,9 @@
 -include tools/make/config.mk
 
 CFLAGS += $(EXTRA_CFLAGS)
+CFLAGS += -DDECK_FORCE=BLHexaFPGA
+
+CFLAGS += -DENABLE_BQ_DECK
 
 ######### JTAG and environment configuration ##########
 OPENOCD           ?= openocd
@@ -193,6 +196,7 @@ PROJ_OBJ += multiranger.o
 PROJ_OBJ += lighthouse.o
 PROJ_OBJ += activeMarkerDeck.o
 PROJ_OBJ += multirangerX9.o
+PROJ_OBJ += blHexaFPGA.o
 
 ifeq ($(LPS_TDOA_ENABLE), 1)
 CFLAGS += -DLPS_TDOA_ENABLE
