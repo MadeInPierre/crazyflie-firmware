@@ -14,8 +14,6 @@
 static bool isInit = false;
 
 #define Addr_FPGA 0b0000101 //I2C addr of the FPGA 0x05
-#define regLowRPM 0b00010000
-#define regHIGHRPM 0b00010001
 #define nbMotors 4
 
 static I2C_Dev *I2Cx;
@@ -23,26 +21,27 @@ static bool bus_inited = false;
 uint8_t val;
 
 // Parameters
-uint16_t RPM[nbMotors];
-uint8_t L_RPM[nbMotors];
-uint8_t H_RPM[nbMotors];
-uint16_t setpoint[nbMotors];
-uint8_t L_setpoint[nbMotors];
-uint8_t H_setpoint[nbMotors];
-uint8_t highTelemetry[nbMotors];
-uint8_t errorDshot[nbMotors];
-uint16_t PIDout[nbMotors];
-uint8_t L_PIDout[nbMotors];
-uint8_t H_PIDout[nbMotors];
-uint8_t config[4];
-bool PID_en[nbMotors];  //bit 0 from config register
-bool I2C_control_en[nbMotors];  //bit 1 from config register
-uint8_t kp[nbMotors];
-uint8_t ki[nbMotors];
-uint8_t kd[nbMotors];
-uint16_t PIDerror[nbMotors];
-uint8_t L_PIDerror[nbMotors];
-uint8_t H_PIDerror[nbMotors];
+uint16_t RPM[nbMotors+1];
+uint8_t L_RPM[nbMotors+1];
+uint8_t H_RPM[nbMotors+1];
+uint16_t setpoint[nbMotors+1];
+uint8_t L_setpoint[nbMotors+1];
+uint8_t H_setpoint[nbMotors+1];
+uint8_t highTelemetry[nbMotors+1];
+uint8_t errorDshot[nbMotors+1];
+uint16_t PIDout[nbMotors+1];
+uint8_t L_PIDout[nbMotors+1];
+uint8_t H_PIDout[nbMotors+1];
+uint8_t config[nbMotors+1];
+uint8_t prev_config[nbMotors+1];
+bool PID_en[nbMotors+1];  //bit 0 from config register
+bool I2C_control_en[nbMotors+1];  //bit 1 from config register
+uint8_t kp[nbMotors+1];
+uint8_t ki[nbMotors+1];
+uint8_t kd[nbMotors+1];
+uint16_t PIDerror[nbMotors+1];
+uint8_t L_PIDerror[nbMotors+1];
+uint8_t H_PIDerror[nbMotors+1];
 // address register parameters (8bit : 4High = num motor, 4Low = addr)
 const uint8_t L_RPM_addr = 0x00;
 const uint8_t H_RPM_addr = 0x01;
@@ -66,39 +65,42 @@ static void task(void *param)
 
     while(1)
     {
-        vTaskDelayUntil(&lastWakeTime, M2T(200));
+        vTaskDelayUntil(&lastWakeTime, M2T(20));
         // Update all the registers
-        for(uint8_t i = 0; i < nbMotors; i++)
+        for(uint8_t i = 1; i <= nbMotors; i++)
+        { 
+            i2cdevReadByte(I2Cx, Addr_FPGA, (i << 4) | L_RPM_addr, &L_RPM[i]);
+            i2cdevReadByte(I2Cx, Addr_FPGA, (i << 4) | H_RPM_addr, &H_RPM[i]);
+            RPM[i] = (H_RPM[i] << 8) | L_RPM[i];
+
+            // i2cdevReadByte(I2Cx, Addr_FPGA, ((i+1) << 4) | L_setpoint_addr, &L_setpoint[i]);
+            // i2cdevReadByte(I2Cx, Addr_FPGA, ((i+1) << 4) | H_setpoint_addr, &H_setpoint[i]);
+            // setpoint[i] = (H_setpoint[i] << 8) | L_setpoint[i];
+
+            i2cdevReadByte(I2Cx, Addr_FPGA,  (i << 4) | H_telemetry_addr, &highTelemetry[i]);
+            i2cdevReadByte(I2Cx, Addr_FPGA,  (i << 4) | errorDshot_addr, &errorDshot[i]);
+
+            // i2cdevReadByte(I2Cx, Addr_FPGA, ((i+1) << 4) | L_PIDout_addr, &L_PIDout[i]);
+            // i2cdevReadByte(I2Cx, Addr_FPGA, ((i+1) << 4) | H_PIDout_addr, &H_PIDout[i]);
+            // PIDout[i] = (H_PIDout[i] << 8) | L_PIDout[i];
+
+            i2cdevReadByte(I2Cx, Addr_FPGA,  (i << 4) | config_addr, &config[i]);
+
+            // i2cdevReadByte(I2Cx, Addr_FPGA,  ((i+1) << 4) | kp_addr, &kp[i]);
+            // i2cdevReadByte(I2Cx, Addr_FPGA,  ((i+1) << 4) | ki_addr, &ki[i]);
+            // i2cdevReadByte(I2Cx, Addr_FPGA,  ((i+1) << 4) | kd_addr, &kd[i]);
+
+            // i2cdevReadByte(I2Cx, Addr_FPGA, ((i+1) << 4) | L_PIDerror_addr, &L_PIDerror[i]);
+            // i2cdevReadByte(I2Cx, Addr_FPGA, ((i+1) << 4) | H_PIDerror_addr, &H_PIDerror[i]);
+            // PIDerror[i] = (H_PIDerror[i] << 8) | L_PIDerror[i];
+        }
+        for(uint8_t j=1; j<=nbMotors; j++)
         {
-
-            i2cdevReadByte(I2Cx, Addr_FPGA, ((i+1) << 4) | L_RPM_addr, &L_RPM[i]);
-            i2cdevReadByte(I2Cx, Addr_FPGA, ((i+1) << 4) | H_RPM_addr, &H_RPM[i]);
-            RPM[i] = (H_RPM[i] << 8) | L_RPM[i];
-
-            i2cdevReadByte(I2Cx, Addr_FPGA, ((i+1) << 4) | L_RPM_addr, &L_RPM[i]);
-            i2cdevReadByte(I2Cx, Addr_FPGA, ((i+1) << 4) | H_RPM_addr, &H_RPM[i]);
-            RPM[i] = (H_RPM[i] << 8) | L_RPM[i];
-
-            i2cdevReadByte(I2Cx, Addr_FPGA, ((i+1) << 4) | L_setpoint_addr, &L_setpoint[i]);
-            i2cdevReadByte(I2Cx, Addr_FPGA, ((i+1) << 4) | H_setpoint_addr, &H_setpoint[i]);
-            setpoint[i] = H_setpoint[i] << 8 | L_setpoint[i];
-
-            i2cdevReadByte(I2Cx, Addr_FPGA,  ((i+1) << 4) | H_telemetry_addr, &highTelemetry[i]);
-            i2cdevReadByte(I2Cx, Addr_FPGA,  ((i+1) << 4) | errorDshot_addr, &errorDshot[i]);
-
-            i2cdevReadByte(I2Cx, Addr_FPGA, ((i+1) << 4) | L_PIDout_addr, &L_PIDout[i]);
-            i2cdevReadByte(I2Cx, Addr_FPGA, ((i+1) << 4) | H_PIDout_addr, &H_PIDout[i]);
-            PIDout[i] = H_PIDout[i] << 8 | L_PIDout[i];
-
-            i2cdevReadByte(I2Cx, Addr_FPGA,  ((i+1) << 4) | config_addr, &config[i]);
-
-            i2cdevReadByte(I2Cx, Addr_FPGA,  ((i+1) << 4) | kp_addr, &kp[i]);
-            i2cdevReadByte(I2Cx, Addr_FPGA,  ((i+1) << 4) | ki_addr, &ki[i]);
-            i2cdevReadByte(I2Cx, Addr_FPGA,  ((i+1) << 4) | kd_addr, &kd[i]);
-
-            i2cdevReadByte(I2Cx, Addr_FPGA, ((i+1) << 4) | L_PIDerror_addr, &L_PIDerror[i]);
-            i2cdevReadByte(I2Cx, Addr_FPGA, ((i+1) << 4) | H_PIDerror_addr, &H_PIDerror[i]);
-            PIDerror[i] = H_PIDerror[i] << 8 | L_PIDerror[i];
+            if (config[j] != prev_config[j])
+            {
+                i2cdevWriteByte(I2Cx, Addr_FPGA, (j << 4) | config_addr, config[j]);
+                prev_config[j] = config[j];
+            }
         }
     }
 }
@@ -113,7 +115,6 @@ static void init()
         bus_inited = true;
         I2Cx = I2C1_DEV;
     }
-
     isInit = true;
     errorDshot[1] = 0xee;
 
@@ -124,11 +125,15 @@ static void init()
 
 static bool test()
 {
-    if(i2cdevReadByte(I2Cx, Addr_FPGA, regLowRPM, &val))
+    if(i2cdevReadByte(I2Cx, Addr_FPGA, (0x10 | config_addr), &val))
     {
         DEBUG_PRINT("I2C FPGA ok\n");
-        if(i2cdevWriteByte(I2Cx, Addr_FPGA, (0x0 | config_addr), 0x00)){
+        if(i2cdevWriteByte(I2Cx, Addr_FPGA, (0x10 | config_addr), 0x00)){
             DEBUG_PRINT("write FPGA config ok\n");
+            i2cdevReadByte(I2Cx, Addr_FPGA, (0x10 | config_addr), &val);
+            // DEBUG_PRINT("Config M1 = ");
+            // sprintf(strDebug, "%d", val);
+            // DEBUG_PRINT(strDebug);
             return true;
         }
         else 
@@ -153,12 +158,7 @@ static const DeckDriver BLHexaFPGA_deck = {
 DECK_DRIVER(BLHexaFPGA_deck);
 
 LOG_GROUP_START(FPGA)
-// for (uint8_t i = 0; i < nbMotors; i++)   // would be better with a preprocessor for loop ...
-// {
-//     LOG_ADD(LOG_UINT16, RPM_1, &RPM[i])
-//     LOG_ADD(LOG_UINT8, config_1, &config[i])
-//     LOG_ADD(LOG_UINT8, errorDshot_1, &errorDshot[i])
-// }
+// would be better with a preprocessor for loop ...
 
 LOG_ADD(LOG_UINT16, RPM_1, &RPM[1])
 LOG_ADD(LOG_UINT16, RPM_2, &RPM[2])
@@ -167,14 +167,6 @@ LOG_ADD(LOG_UINT16, RPM_4, &RPM[4])
 #if nbMotors==6
 LOG_ADD(LOG_UINT16, RPM_5, &RPM[5])
 LOG_ADD(LOG_UINT16, RPM_6, &RPM[6])
-#endif
-LOG_ADD(LOG_UINT8, config_1, &config[1])
-LOG_ADD(LOG_UINT8, config_2, &config[2])
-LOG_ADD(LOG_UINT8, config_3, &config[3])
-LOG_ADD(LOG_UINT8, config_4, &config[4])
-#if nbMotors==6
-LOG_ADD(LOG_UINT8, config_5, &config[5])
-LOG_ADD(LOG_UINT8, config_6, &config[6])
 #endif
 
 LOG_ADD(LOG_UINT8, errorDshot_1, &errorDshot[1])
