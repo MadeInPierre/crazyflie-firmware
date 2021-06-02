@@ -131,9 +131,16 @@ static bool test()
         if(i2cdevWriteByte(I2Cx, Addr_FPGA, (0x10 | config_addr), 0x00)){
             DEBUG_PRINT("write FPGA config ok\n");
             i2cdevReadByte(I2Cx, Addr_FPGA, (0x10 | config_addr), &val);
-            // DEBUG_PRINT("Config M1 = ");
-            // sprintf(strDebug, "%d", val);
-            // DEBUG_PRINT(strDebug);
+
+            for(uint8_t i = 1; i<= nbMotors; i++)
+            {
+                i2cdevWriteByte(I2Cx, Addr_FPGA, (i << 4) | config_addr, 0x80);
+                i2cdevReadByte(I2Cx, Addr_FPGA,  (i << 4) | config_addr, &config[i]);
+
+                if(config[i] != 0x80)
+                    break;
+            }
+            DEBUG_PRINT("Motors enabled\n");
             return true;
         }
         else 

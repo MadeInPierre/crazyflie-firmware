@@ -69,7 +69,7 @@ motionBurst_t currentMotion;
 // Disables pushing the flow measurement in the EKF
 static bool useFlowDisabled = false;
 
-#define NCS_PIN DECK_GPIO_IO3
+#define NCS_PIN DECK_GPIO_IO1
 
 
 static void flowdeckTask(void *param)
