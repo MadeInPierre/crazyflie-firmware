@@ -60,7 +60,8 @@ static bool isPassed = false;
 
 //Address of the 2 I2C Expander
 #define AddrPCA_A 0b0111100
-#define AddrPCA_B 0b0111000
+// #define AddrPCA_B 0b0111000
+#define AddrPCA_B 0b0111001 // V2
 
 static VL53L1_Dev_t devFront;
 static VL53L1_Dev_t devBack;
