@@ -443,6 +443,28 @@ static const MotorPerifDef DECK_IO3 =
     .preloadConfig = TIM_OC1PreloadConfig,
 };
 
+// Deck IO4, PC12, TIM3_CH1
+static const MotorPerifDef DECK_IO4 =
+{
+    .drvType       = BRUSHLESS,
+    .gpioPerif     = RCC_AHB1Periph_GPIOB,
+    .gpioPort      = GPIOC,
+    .gpioPin       = GPIO_Pin_12,
+    .gpioPinSource = GPIO_PinSource12,
+    .gpioOType     = GPIO_OType_OD,
+    .gpioAF        = GPIO_AF_TIM3,
+    .timPerif      = RCC_APB1Periph_TIM3,
+    .tim           = TIM3,
+    .timPolarity   = TIM_OCPolarity_High,
+    .timDbgStop    = DBGMCU_TIM3_STOP,
+    .timPeriod     = MOTORS_BL_PWM_PERIOD,
+    .timPrescaler  = MOTORS_BL_PWM_PRESCALE,
+    .setCompare    = TIM_SetCompare1,
+    .getCompare    = TIM_GetCapture1,
+    .ocInit        = TIM_OC1Init,
+    .preloadConfig = TIM_OC1PreloadConfig,
+};
+
 // Deck SCK, PA5, TIM2_CH1
 static const MotorPerifDef DECK_SCK =
 {
@@ -542,6 +564,19 @@ const MotorPerifDef* motorMapBigQuadDeck[NBR_OF_MOTORS] =
 //   &DECK_TX2_TIM2,
 //   &DECK_IO2,
 //   &DECK_RX2_TIM2
+};
+
+/**
+ * Brushless FPGA Hexa brushless
+ */
+const MotorPerifDef* motorMapHexaBrushless[NBR_OF_MOTORS] =
+{
+    &DECK_IO1_TIM4,
+    &DECK_IO2,
+    &DECK_IO3,
+    &DECK_IO4,
+    &DECK_TX2_TIM2,  
+    &DECK_RX2_TIM2 
 };
 
 /**

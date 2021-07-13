@@ -38,6 +38,8 @@ static struct {
   uint32_t m2;
   uint32_t m3;
   uint32_t m4;
+  uint32_t m5;
+  uint32_t m6;
 } motorPower;
 
 static struct {
@@ -45,6 +47,8 @@ static struct {
   uint16_t m2;
   uint16_t m3;
   uint16_t m4;
+  uint16_t m5;
+  uint16_t m6;
 } motorPowerSet;
 
 void powerDistributionInit(void)
@@ -69,6 +73,8 @@ void powerStop()
   motorsSetRatio(MOTOR_M2, 0);
   motorsSetRatio(MOTOR_M3, 0);
   motorsSetRatio(MOTOR_M4, 0);
+  motorsSetRatio(MOTOR_M5, 0);
+  motorsSetRatio(MOTOR_M6, 0);
 }
 
 void powerDistribution(const control_t *control)
@@ -97,6 +103,8 @@ void powerDistribution(const control_t *control)
     motorsSetRatio(MOTOR_M2, motorPowerSet.m2);
     motorsSetRatio(MOTOR_M3, motorPowerSet.m3);
     motorsSetRatio(MOTOR_M4, motorPowerSet.m4);
+    motorsSetRatio(MOTOR_M5, motorPowerSet.m5);
+    motorsSetRatio(MOTOR_M6, motorPowerSet.m6);
   }
   else
   {
@@ -104,6 +112,8 @@ void powerDistribution(const control_t *control)
     motorsSetRatio(MOTOR_M2, motorPower.m2);
     motorsSetRatio(MOTOR_M3, motorPower.m3);
     motorsSetRatio(MOTOR_M4, motorPower.m4);
+    motorsSetRatio(MOTOR_M5, motorPower.m5);
+    motorsSetRatio(MOTOR_M6, motorPower.m6);
   }
 }
 
@@ -113,6 +123,8 @@ PARAM_ADD(PARAM_UINT16, m1, &motorPowerSet.m1)
 PARAM_ADD(PARAM_UINT16, m2, &motorPowerSet.m2)
 PARAM_ADD(PARAM_UINT16, m3, &motorPowerSet.m3)
 PARAM_ADD(PARAM_UINT16, m4, &motorPowerSet.m4)
+PARAM_ADD(PARAM_UINT16, m5, &motorPowerSet.m5)
+PARAM_ADD(PARAM_UINT16, m6, &motorPowerSet.m6)
 PARAM_GROUP_STOP(ring)
 
 LOG_GROUP_START(motor)
@@ -120,4 +132,6 @@ LOG_ADD(LOG_INT32, m4, &motorPower.m4)
 LOG_ADD(LOG_INT32, m1, &motorPower.m1)
 LOG_ADD(LOG_INT32, m2, &motorPower.m2)
 LOG_ADD(LOG_INT32, m3, &motorPower.m3)
+LOG_ADD(LOG_INT32, m5, &motorPower.m5)
+LOG_ADD(LOG_INT32, m6, &motorPower.m6)
 LOG_GROUP_STOP(motor)

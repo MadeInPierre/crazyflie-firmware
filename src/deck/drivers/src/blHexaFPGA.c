@@ -14,7 +14,7 @@
 static bool isInit = false;
 
 #define Addr_FPGA 0b0000101 //I2C addr of the FPGA 0x05
-#define nbMotors 4
+#define nbMotors 6
 
 static I2C_Dev *I2Cx;
 static bool bus_inited = false;
